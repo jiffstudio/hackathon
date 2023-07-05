@@ -1,3 +1,4 @@
+from bs4 import BeautifulSoup
 import streamlit as st
 import pypandoc
 import os
@@ -15,7 +16,7 @@ def save_uploadedfile(uploadedfile):
 
 
 def pdf_to_html(filepath):
-    html_filepath = filepath.rsplit('.', 1)[0] + '.html'
+    html_filepath = filepath.rsplit('.', 1)[0] + '.mind_map'
     # 将 Windows 路径转换为 Docker 中的路径
     docker_filepath = filepath.replace("\\", "/").replace("D:", "/mnt/d")
     docker_html_filepath = html_filepath.replace("\\", "/").replace("D:", "/mnt/d")
@@ -26,9 +27,15 @@ def pdf_to_html(filepath):
     return html_filepath
 
 
-def convert_to_md(filepath):
-    output = pypandoc.convert_file(filepath, 'html', 'markdown', outputfile="output.md")
-    assert output == ""
+def html_to_text(filepath):
+    with open(filepath, 'r', encoding='utf-8') as f:
+        contents = f.read()
+
+    soup = BeautifulSoup(contents, 'lxml')
+    text = soup.get_text()
+
+    with open(filepath.rsplit('.', 1)[0] + '.md', 'w', encoding='utf-8') as f:
+        f.write(text)
 
 
 def main():
@@ -47,7 +54,7 @@ def main():
             st.write(file_details)
             file_path = save_uploadedfile(uploaded_file)
             html_file_path = pdf_to_html(file_path)
-            convert_to_md(html_file_path)
+            html_to_text(html_file_path)
             st.write('文件已成功转换为 markdown 格式')
             # Display the PDF file
             st.markdown(f'<iframe src="{file_path}" width="700" height="800"></iframe>', unsafe_allow_html=True)
