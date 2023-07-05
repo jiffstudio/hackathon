@@ -9,6 +9,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.llms import OpenAI
 from langchain.chains.question_answering import load_qa_chain
 
+import openai
 
 # 文章存储位置
 PAPER_PERSIST = 'paper_chroma'
@@ -17,6 +18,7 @@ CARD_PERSIST = 'card_chroma'
 
 # openai key
 OPENAI_API_KEY = "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"
+openai.api_key = OPENAI_API_KEY
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 os.environ["http_proxy"] = "http://localhost:7890"
 os.environ["https_proxy"] = "http://localhost:7890"
@@ -31,6 +33,7 @@ def load_pdf(pdf_path):
     """
     loader = UnstructuredFileLoader(pdf_path)
     doc = loader.load()
+    print(doc)
     return doc
 
 
@@ -108,19 +111,19 @@ def card_store_demo():
     card_chroma(cards, pdf_path)
 
 
-def paper_search_demo():
+def paper_search_demo(que):
     """
-    基于本地文章知识库与llm做问答
+    基于本地文章知识库与llm做问答，
     """
     # 加载存储的文本向量
     vectordb = Chroma(persist_directory=PAPER_PERSIST, embedding_function=embeddings)
-    query = "What is a knowledge base?"
+    query = que
     # 相关性搜索，搜索三个最相关的内容
-    docs = vectordb.similarity_search(query, k=3)
-    print(len(docs))
+    docs = vectordb.similarity_search_with_score(query, k=3)
     print(docs[0])
-
-    llm = OpenAI(temperature=0.3, openai_api_key=OPENAI_API_KEY)
+    if docs[0][1] >= 0.5:
+        print('相似度低，本地知识库可能不含当前提问内容')
+    llm = OpenAI(temperature=0.2, openai_api_key=OPENAI_API_KEY)
 
     """chain_type：chain类型 
     stuff: 这种最简单粗暴，会把所有的 document 一次全部传给 llm 模型进行总结。如果document很多的话，势必会报超出最大 token 
@@ -132,21 +135,55 @@ def paper_search_demo():
     模型，最后 llm 模型返回具体答案。 """
 
     chain = load_qa_chain(llm, chain_type="refine")
-    chain.run(input_documents=docs, question=query)
+    result = chain({"input_documents": docs, "question": query}, return_only_outputs=True)
+    print(result['output_text'])
+    return result['output_text']
 
 
-def card_search_demo():
+def card_search_demo(que):
     """
     查抽认卡
     """
     # 加载存储的文本向量
     vectordb = Chroma(persist_directory=CARD_PERSIST, embedding_function=embeddings)
-    query = "复杂KBQA任务的定义"
-    docs = vectordb.similarity_search(query, k=3)
-    print(len(docs))
+    query = que
+    docs = vectordb.similarity_search_with_score(query, k=3)
+    # 余弦相似度形式 docs为tuple的列表 docs[0]为(Document, sim)，所以docs[0][1]输出余弦距离，0-1
     print(docs[0])
+    if docs[0][1] >= 0.5:
+        print('相似度低，卡片可能未存储有关问题')
+        return -1
+    # 有对应内容，整合llm给出答案即可
+    llm = OpenAI(temperature=0.1, openai_api_key=OPENAI_API_KEY)
+    chain = load_qa_chain(llm, chain_type="refine")
+    result = chain({"input_documents": docs, "question": query}, return_only_outputs=True)
+    print(result['output_text'])
+    return result['output_text']
+
+
+def paper_abstract(text):
+    """ 特定段落文本摘要 """
+    prompt = [{"role": "system", "content": open('prompt/abstract.txt', 'r', encoding='utf-8').read()},
+              {"role": "user", "content": text}]
+    completion = openai.ChatCompletion.create(
+        model='gpt-3.5-turbo',
+        messages=prompt,
+        max_tokens=1024,
+        temperature=0.4
+    )
+    message = completion.choices[0].message.content
+    print('message: ', message)
+    return message
 
 
 if __name__ == '__main__':
-    card_store_demo()
-    card_search_demo()
+    # card_store_demo()
+    # res = card_search_demo('haha')
+    # if res != -1:
+    #     print('基于抽认卡得到了答案')
+    # else:
+    #     paper_search_demo("What is a knowledge base?")
+    paper_abstract("法律文本以及其他自然语言文本数据，如科学文献、新闻文章或社交媒体，在 "
+                   "互联网和专门系统中呈指数级增长。与其他文本数据不同，法律文本在句子或各种文章之间包含法律特定的单词、短语、问题、概念和因素的严格逻辑联系。这些都是为了帮助人们在特定情况下进行正确的论证，避免歧义。不幸的是，这也使得法律领域的信息检索和问答变得比其他领域更加复杂。 "
+                   "法律领域的信息检索(IR)主要有两种方法[1]:手工知识工程(KE)和自然语言处理(NLP)。在 KE "
+                   "方法中，努力将法律专家记忆和分类案例的方式翻译成数据结构和算法，这些数据结构和算法将用于信息检索。虽然这种方法通常会产生很好的结果，但由于构建知识库时的时间和财务成本，很难在实践中应用。相比之下，基于NLP的IR系统更加实用，因为它们被设计用来通过利用NLP技术快速处理数千兆字节的数据。然而，在设计这样的系统时，提出了几个挑战。例如，法律语言中的因素和概念以不同于常见用法的方式应用[2]。因此，为了有效地回答一个法律问题，它必须比较预先发现的相关文章中问题和句子之间的语义联系。")
