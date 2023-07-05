@@ -2,6 +2,9 @@
   .highlight {
       background-color: yellow;
   }
+  #text {
+    padding: 20px;
+  }
 </style>
 <html>
   <body>
@@ -44,17 +47,17 @@
         const selectedText = window.getSelection().toString();
 
             // Remove existing highlights
-            const highlightedText = document.getElementsByClassName("highlight");
-            while (highlightedText.length > 0) {
-                const parentElement = highlightedText[0].parentNode;
-                parentElement.replaceChild(highlightedText[0].firstChild, highlightedText[0]);
-            }
+            // const highlightedText = document.getElementsByClassName("highlight");
+            // while (highlightedText.length > 0) {
+            //     const parentElement = highlightedText[0].parentNode;
+            //     parentElement.replaceChild(highlightedText[0].firstChild, highlightedText[0]);
+            // }
 
             if (selectedText !== "") {
-                const range = window.getSelection().getRangeAt(0);
-                const newNode = document.createElement("span");
-                newNode.classList.add("highlight");
-                range.surroundContents(newNode);
+                // const range = window.getSelection().getRangeAt(0);
+                // const newNode = document.createElement("span");
+                // newNode.classList.add("highlight");
+                // range.surroundContents(newNode);
 
                 
                 // 打印出来的是选中的文本

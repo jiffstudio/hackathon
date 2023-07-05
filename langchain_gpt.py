@@ -1,5 +1,7 @@
 
 import os
+import re
+
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.schema import Document
 from langchain.vectorstores import Chroma
@@ -17,7 +19,7 @@ PAPER_PERSIST = 'paper_chroma'
 CARD_PERSIST = 'card_chroma'
 
 # openai key
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = "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"
 openai.api_key = OPENAI_API_KEY
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 os.environ["http_proxy"] = "http://localhost:7890"
@@ -81,6 +83,7 @@ def paper_store_demo():
     pdf_path = 'pdf/A Survey on Complex Knowledge Base Question Answering.pdf'
     doc = load_pdf(pdf_path)
     print(f'initial: There are {len(doc[0].page_content)} characters in your document')
+    print(doc[0].page_content)
 
     # 初始化文本分割器
     text_splitter = RecursiveCharacterTextSplitter(
@@ -163,6 +166,7 @@ def card_search_demo(que):
 
 def paper_abstract(text):
     """ 特定段落文本摘要 """
+    print(open('prompt/abstract.txt', 'r', encoding='utf-8').read())
     prompt = [{"role": "system", "content": open('prompt/abstract.txt', 'r', encoding='utf-8').read()},
               {"role": "user", "content": text}]
     completion = openai.ChatCompletion.create(
@@ -173,7 +177,113 @@ def paper_abstract(text):
     )
     message = completion.choices[0].message.content
     print('message: ', message)
+    # 画图 TODO
+    # draw_abstract(message)
     return message
+
+
+# -------------------- TODO 怎么把输出的主题，分支等内容存储成树结构 -----------------------
+class Node:
+    def __init__(self, data):
+        self.data = data
+        self.children = []
+
+    def add_child(self, child):
+        self.children.append(child)
+
+
+def read_message(content):
+    # 切割主题
+    topic_start = content.index("主题：")
+    topic_end = content.index("\n\n", topic_start)
+    topic = content[topic_start + 3:topic_end]
+
+    # 切割分支
+    branches = []
+    branch_starts = [m.start() for m in re.finditer("分支\d+：", content)]
+    branch_starts.append(len(content))  # 添加末尾位置，用于切割最后一个分支
+    for i in range(len(branch_starts) - 1):
+        branch_start = branch_starts[i]
+        branch_end = branch_starts[i + 1]
+        branch_content = content[branch_start+3: branch_end].strip()
+        branches.append(branch_content)
+
+    print("主题:", topic)
+    print("分支:")
+    for branch in branches:
+        print(branch)
+
+
+def build_tree():
+    # 构建树形数据结构
+    topic = Node("主题：法律领域的信息检索和问答")
+
+    branch1 = Node("法律文本的特点")
+    branch1_content1 = Node("法律特定的单词、短语、问题、概念和因素")
+    branch1_content2 = Node("严格的逻辑联系")
+    branch1_content3 = Node("避免歧义")
+
+    branch1.add_child(branch1_content1)
+    branch1.add_child(branch1_content2)
+    branch1.add_child(branch1_content3)
+
+    branch2 = Node("法律信息检索的方法")
+    branch2_content1 = Node("手工知识工程(KE)方法")
+    branch2_content1_1 = Node("将法律专家记忆和分类案例翻译成数据结构和算法")
+    branch2_content1_2 = Node("构建知识库的时间和财务成本高")
+
+    branch2_content2 = Node("自然语言处理(NLP)方法")
+    branch2_content2_1 = Node("利用NLP技术快速处理大量数据")
+    branch2_content2_2 = Node("面临挑战：法律语言中因素和概念的特殊应用方式")
+
+    branch2.add_child(branch2_content1)
+    branch2.add_child(branch2_content2)
+
+    branch2_content1.add_child(branch2_content1_1)
+    branch2_content1.add_child(branch2_content1_2)
+
+    branch2_content2.add_child(branch2_content2_1)
+    branch2_content2.add_child(branch2_content2_2)
+
+    branch3 = Node("有效回答法律问题的要求")
+    branch3_content1 = Node("比较问题和句子之间的语义联系")
+    branch3_content2 = Node("预先发现相关文章中的问题和句子")
+
+    branch3.add_child(branch3_content1)
+    branch3.add_child(branch3_content2)
+
+    topic.add_child(branch1)
+    topic.add_child(branch2)
+    topic.add_child(branch3)
+
+
+def draw_abstract(message: str):
+    """ 思维导图绘制"""
+    # import streamlit as st
+    from graphviz import Digraph
+    import streamlit as st
+    import random
+
+    COLOR = ["#B4E7B7", "#CFDBF6", "#FFFFCC", "#E6FFCC", "#FFCCCC", "#EAD1F0", "#D2D6F9", "#F6BBDB", "#F8D5B5"]
+    st.title("动态绘制思维导图")
+    graph = Digraph(node_attr={'style': "filled", 'shape': "ellipse", 'color': "#B4E7B7", 'size': "16"},
+                    edge_attr={'style': "dashed", 'color': "#67C2A4"})
+    graph.graph_attr['rankdir'] = 'LR'
+    graph.edge_attr.update(arrowhead='normal', arrowsize='1')
+    # graph.attr('node', shape='rarrow')
+    # Markdown处理
+    message.split('\n')
+
+    graph.node("A", "法律领域的信息检索和问答", _attributes={'color': COLOR[random.randint(0, 8)]})
+    graph.node("B", "法律文本的特点", _attributes={'color': COLOR[random.randint(0, 8)]})
+    graph.node("C", "法律信息检索的方法", _attributes={'color': COLOR[random.randint(0, 8)]})
+    graph.node("D", "有效回答法律问题的要求", _attributes={'color': COLOR[random.randint(0, 8)]})
+    graph.node("E", "法律特定的单词、短语、问题、概念和因素", _attributes={'color': COLOR[random.randint(0, 8)]})
+    graph.node("F", "严格的逻辑联系", _attributes={'color': COLOR[random.randint(0, 8)]})
+    graph.node("G", "避免歧义", _attributes={'color': COLOR[random.randint(0, 8)]})
+    graph.edges([("A", "B"), ("A", "C"), ("A", "D"), ("B", "E"), ("B", "F"), ("B", "G")])
+
+    st.graphviz_chart(graph.source)
 
 
 if __name__ == '__main__':
@@ -183,7 +293,7 @@ if __name__ == '__main__':
     #     print('基于抽认卡得到了答案')
     # else:
     #     paper_search_demo("What is a knowledge base?")
-    paper_abstract("法律文本以及其他自然语言文本数据，如科学文献、新闻文章或社交媒体，在 "
-                   "互联网和专门系统中呈指数级增长。与其他文本数据不同，法律文本在句子或各种文章之间包含法律特定的单词、短语、问题、概念和因素的严格逻辑联系。这些都是为了帮助人们在特定情况下进行正确的论证，避免歧义。不幸的是，这也使得法律领域的信息检索和问答变得比其他领域更加复杂。 "
-                   "法律领域的信息检索(IR)主要有两种方法[1]:手工知识工程(KE)和自然语言处理(NLP)。在 KE "
-                   "方法中，努力将法律专家记忆和分类案例的方式翻译成数据结构和算法，这些数据结构和算法将用于信息检索。虽然这种方法通常会产生很好的结果，但由于构建知识库时的时间和财务成本，很难在实践中应用。相比之下，基于NLP的IR系统更加实用，因为它们被设计用来通过利用NLP技术快速处理数千兆字节的数据。然而，在设计这样的系统时，提出了几个挑战。例如，法律语言中的因素和概念以不同于常见用法的方式应用[2]。因此，为了有效地回答一个法律问题，它必须比较预先发现的相关文章中问题和句子之间的语义联系。")
+    draw_abstract("1")
+    paper_abstract("法律文本以及其他自然语言文本数据，如科学文献、新闻文章或社交媒体，在互联网和专门系统中呈指数级增长。与其他文本数据不同，法律文本在句子或各种文章之间包含法律特定的单词、短语、问题、概念和因素的严格逻辑联系。这些都是为了帮助人们在特定情况下进行正确的论证，避免歧义。不幸的是，这也使得法律领域的信息检索和问答变得比其他领域更加复杂。"
+                   "法律领域的信息检索(IR)主要有两种方法[1]:手工知识工程(KE)和自然语言处理(NLP)。在 KE 方法中，努力将法律专家记忆和分类案例的方式翻译成数据结构和算法，这些数据结构和算法将用于信息检索。虽然这种方法通常会产生很好的结果，但由于构建知识库时的时间和财务成本，很难在实践中应用。"
+                   "相比之下，基于NLP的IR系统更加实用，因为它们被设计用来通过利用NLP技术快速处理数千兆字节的数据。然而，在设计这样的系统时，提出了几个挑战。例如，法律语言中的因素和概念以不同于常见用法的方式应用[2]。因此，为了有效地回答一个法律问题，它必须比较预先发现的相关文章中问题和句子之间的语义联系")

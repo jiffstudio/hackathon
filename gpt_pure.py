@@ -15,8 +15,8 @@ from streamlit_chat import message
 
 def rev_gpt():
     """ gpt的封装，速度好像比原API快一点 """
-    os.environ["OPENAI_API_KEY"] = "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"
-    chatbot = Chatbot(api_key="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", proxy="http://127.0.0.1:7890")
+    os.environ["OPENAI_API_KEY"] = "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"
+    chatbot = Chatbot(api_key="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", proxy="http://127.0.0.1:7890")
     chatbot.engine = 'gpt-3.5-turbo'
     print("Chatbot: ")
     for data in chatbot.ask_stream(
@@ -29,7 +29,7 @@ def rev_gpt():
 #  -------------------------------  chat_bot  -----------------------------------------
 
 # 申请的api_key
-openai.api_key = "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"
+openai.api_key = "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"
 os.environ["OPENAI_API_KEY"] = openai.api_key
 os.environ["http_proxy"] = "http://localhost:7890"
 os.environ["https_proxy"] = "http://localhost:7890"
